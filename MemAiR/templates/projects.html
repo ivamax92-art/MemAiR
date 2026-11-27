@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block title %}Мои проекты — MemAiR{% endblock %}
+
+{% block content %}
+<main class="main-container">
+    <div class="page-header">
+        <h1 style="font-size: 32px; font-weight: 800;">Мои проекты</h1>
+        <a href="{{ url_for('editor') }}" style="background: var(--color-purple); color: white; padding: 10px 20px; border-radius: 12px; font-weight: 600; text-decoration: none;">+ Создать новый</a>
+    </div>
+
+    <div class="meme-grid">
+        {% for p in items %}
+        <article class="meme-card">
+            <!-- Теперь используем чистый CSS-класс, без встроенных скобок Jinja -->
+            <span class="status-badge {{ p.status }}">
+                {{ 'Опубликовано' if p.status == 'published' else 'Черновик' }}
+            </span>
+            
+            <div class="meme-image-wrapper">
+                <img src="{{ url_for('static', filename='images/' + p.image) }}" alt="{{ p.title }}" class="meme-image">
+            </div>
+            <div style="padding: 16px; display: flex; flex-direction: column; gap: 15px;">
+                <h3>{{ p.title }}</h3>
+                <div style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center;">
+                    <a href="{{ url_for('editor') }}" style="padding: 8px 16px; border-radius: var(--radius-md); font-weight: 600; font-size: 14px; background: #F4F5F7; color: var(--text-main); text-decoration: none;">✏️ Редактировать</a>
+                    
+                    {% if p.status == 'draft' %}
+                    <form method="POST" action="{{ url_for('publish_project', project_id=p.id) }}" style="margin: 0;">
+                        <button type="submit" style="padding: 8px 16px; border-radius: var(--radius-md); font-weight: 600; font-size: 14px; background: var(--color-purple); color: white; border: none; cursor: pointer;">🚀 Опубликовать</button>
+                    </form>
+                    {% endif %}
+                    <button style="padding: 8px 16px; border-radius: var(--radius-md); font-weight: 600; font-size: 14px; background: rgba(255, 71, 87, 0.1); color: var(--danger-color); margin-left: auto; border: none; cursor: pointer;">🗑</button>
+                </div>
+            </div>
+        </article>
+        {% else %}
+        <div style="grid-column: 1/-1; text-align: center; padding: 50px; background: white; border-radius: 20px;">
+            <h2 style="color: var(--text-muted); margin-bottom: 10px;">У вас пока нет проектов</h2>
+            <p style="color: var(--text-muted);">Нажмите кнопку «Создать новый» в правом верхнем углу, чтобы начать.</p>
+        </div>
+        {% endfor %}
+    </div>
+</main>
+{% endblock %}

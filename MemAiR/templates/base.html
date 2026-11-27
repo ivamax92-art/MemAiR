@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}MemAiR{% endblock %}</title>
+    
+    <!-- Шрифт -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <!-- ЕДИНЫЙ CSS -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+
+    <header class="header">
+        <div class="header-left">
+            <a href="{{ url_for('feed') }}" class="logo-link" title="На главную (Лента мемов)">
+                <img src="{{ url_for('static', filename='images/memair.png') }}" alt="MemAiR" class="logo-img">
+            </a>
+            <nav class="nav-links">
+                <a href="{{ url_for('ai') }}">AI-функционал</a>
+            </nav>
+        </div>
+        <div class="header-right">
+            <a href="{{ url_for('editor') }}" class="btn-create-img" title="Создать мем">
+                <img src="{{ url_for('static', filename='images/sozdatmem.png') }}" alt="Создать мем">
+            </a>
+            
+            {% if user %}
+                <div class="user-menu-wrapper">
+                    <div class="user-avatar" {% if user.avatar %}style="background-image: url('{{ user.avatar }}'); color: transparent;"{% endif %}>
+                        {% if not user.avatar %}{{ user.name[0]|upper }}{% endif %}
+                    </div>
+                    <div class="dropdown">
+                        <b>{{ user.name }}</b>
+                        <a href="{{ url_for('profile') }}">Личный профиль</a>
+                        <a href="{{ url_for('projects') }}">Мои проекты</a>
+                        <a href="{{ url_for('logout') }}" style="color: var(--danger-color);">Выйти</a>
+                    </div>
+                </div>
+            {% else %}
+                <a href="{{ url_for('login') }}" class="btn-rate" style="background: var(--color-purple); color: white; padding: 10px 24px;">Войти</a>
+            {% endif %}
+        </div>
+    </header>
+
+    {% block content %}{% endblock %}
+
+    <!-- ЕДИНЫЙ JS -->
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+</body>
+</html>

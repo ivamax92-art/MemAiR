@@ -1,0 +1,737 @@
+{% extends "base.html" %}
+{% block title %}Редактор мемов — MemAiR{% endblock %}
+
+{% block content %}
+<style>
+    .editor-layout { display: flex; height: calc(100vh - 90px); padding: 16px; gap: 16px; box-sizing: border-box; }
+    .panel { background: #fff; border-radius: var(--radius-lg); box-shadow: var(--shadow-sm); display: flex; flex-direction: column; border: 1px solid var(--border-color); }
+    
+    .toolbar-left { width: 72px; align-items: center; padding: 16px 0; gap: 8px; flex-shrink: 0; }
+    .tool-btn { width: 48px; height: 48px; border-radius: var(--radius-md); display: flex; align-items: center; justify-content: center; color: var(--text-muted); transition: all 0.2s; cursor: pointer; background: transparent; border: none; }
+    .tool-btn:hover { background: #FCE6FF; color: var(--color-purple); }
+    .tool-btn.active { background: var(--color-purple); color: #fff; box-shadow: 0 4px 12px rgba(228, 98, 251, 0.4); }
+    .divider-h { width: 32px; height: 1px; background: var(--border-color); margin: 8px 0; }
+    
+    .canvas-area { flex: 1; display: flex; align-items: center; justify-content: center; position: relative; overflow: hidden; border-radius: var(--radius-lg); background: #E1E4E8; }
+    .canvas-wrapper { background: #fff; box-shadow: 0 10px 30px rgba(0,0,0,0.2); position: relative; }
+    #memeCanvas { display: block; cursor: default; }
+    #memeCanvas.drawing { cursor: crosshair; }
+    #memeCanvas.movable { cursor: move; }
+    
+    .panel-right { width: 340px; flex-shrink: 0; display: flex; flex-direction: column; gap: 16px; overflow-y: auto; }
+    .panel-section { background: #fff; border-radius: var(--radius-lg); box-shadow: var(--shadow-sm); padding: 20px; border: 1px solid var(--border-color); }
+    .section-title { font-size: 16px; font-weight: 700; margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center; }
+    
+    .prop-group { margin-bottom: 16px; }
+    .prop-label { font-size: 13px; font-weight: 600; color: var(--text-muted); margin-bottom: 8px; display: block; }
+    .input-text, .input-select { width: 100%; padding: 10px 12px; border: 1px solid var(--border-color); border-radius: 8px; font-family: inherit; font-size: 14px; outline: none; }
+    .input-text:focus, .input-select:focus { border-color: var(--color-purple); }
+    .prop-row { display: flex; gap: 8px; }
+    .input-color-wrapper { width: 40px; height: 40px; border-radius: 8px; border: 1px solid var(--border-color); overflow: hidden; padding: 2px; cursor: pointer; flex-shrink: 0; }
+    .input-color { width: 100%; height: 100%; border: none; cursor: pointer; padding: 0; }
+    
+    .layer-item { display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; border-radius: 8px; background: #F8F9FA; margin-bottom: 8px; border: 1px solid transparent; cursor: pointer; }
+    .layer-item:hover { border-color: var(--border-color); }
+    .layer-item.active { background: #FCE6FF; border-color: var(--color-purple); }
+    .layer-name { font-size: 14px; font-weight: 500; display: flex; align-items: center; gap: 8px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 140px; }
+    .layer-controls { display: flex; gap: 4px; }
+    .btn-layer-ctrl { width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; border-radius: 4px; color: var(--text-muted); cursor: pointer; background: none; border: none; font-size: 14px; }
+    .btn-layer-ctrl:hover { background: rgba(0,0,0,0.05); color: var(--text-main); }
+    
+    .btn-floating { position: absolute; top: 20px; right: 20px; display: flex; gap: 10px; z-index: 10; }
+    
+    .sticker-panel { position: absolute; top: 60px; left: 80px; background: #fff; border-radius: var(--radius-md); box-shadow: 0 10px 30px rgba(0,0,0,0.2); padding: 16px; display: none; z-index: 20; width: 360px; max-height: 400px; overflow-y: auto; }
+    .sticker-panel.active { display: block; }
+    .sticker-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 12px; }
+    .sticker-item { width: 70px; height: 70px; display: flex; align-items: center; justify-content: center; cursor: pointer; border-radius: 8px; transition: 0.2s; background: #F8F9FA; padding: 6px; }
+    .sticker-item:hover { background: #FCE6FF; transform: scale(1.05); }
+    .sticker-item img { max-width: 100%; max-height: 100%; object-fit: contain; }
+    .empty-stickers { text-align: center; color: var(--text-muted); font-size: 14px; padding: 20px; }
+</style>
+
+<div class="editor-layout">
+    
+    <!-- ЛЕВАЯ ПАНЕЛЬ -->
+    <div class="panel toolbar-left">
+        <button class="tool-btn" onclick="document.getElementById('bgUpload').click()" title="Загрузить фон">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+        </button>
+        <input type="file" id="bgUpload" accept="image/*" style="display: none;" onchange="loadBackground(event)">
+        
+        <button class="tool-btn" id="toolSelect" onclick="setTool('select')" title="Выделение">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3l7.07 16.97 2.51-7.39 7.39-2.51L3 3z"/></svg>
+        </button>
+        
+        <button class="tool-btn" id="toolText" onclick="addText()" title="Добавить текст">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 7 4 4 20 4 20 7"/><line x1="9" y1="20" x2="15" y2="20"/><line x1="12" y1="4" x2="12" y2="20"/></svg>
+        </button>
+        
+        <button class="tool-btn" id="toolSticker" onclick="toggleStickerPanel()" title="Стикеры">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
+        </button>
+        
+        <button class="tool-btn" id="toolBrush" onclick="setTool('brush')" title="Кисть">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 19l7-7 3 3-7 7-3-3z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/></svg>
+        </button>
+        
+        <div class="divider-h"></div>
+        
+        <button class="tool-btn" onclick="undo()" title="Отменить (Ctrl+Z)">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 14 4 9 9 4"/><path d="M20 20v-7a4 4 0 0 0-4-4H4"/></svg>
+        </button>
+        <button class="tool-btn" onclick="redo()" title="Повторить (Ctrl+Y)">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 14 20 9 15 4"/><path d="M4 20v-7a4 4 0 0 1 4-4h12"/></svg>
+        </button>
+    </div>
+
+    <!-- ХОЛСТ -->
+    <div class="canvas-area">
+        <div class="canvas-wrapper">
+            <canvas id="memeCanvas" width="600" height="600"></canvas>
+        </div>
+        
+        <div class="btn-floating">
+            <button onclick="downloadMeme()" class="btn btn-primary" style="padding: 12px 24px;">⬇️ Скачать PNG</button>
+        </div>
+        
+        <div class="sticker-panel" id="stickerPanel">
+            <div style="font-weight: 700; margin-bottom: 8px;">Стикеры</div>
+            <div id="stickerGrid" class="sticker-grid">
+                <div class="empty-stickers">Загрузка...</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ПРАВАЯ ПАНЕЛЬ -->
+    <div class="panel-right">
+        <div class="panel-section" id="propertiesPanel">
+            <div class="section-title">Свойства</div>
+            <div id="propertiesContent" style="color: var(--text-muted); font-size: 14px;">
+                Выберите объект на холсте или добавьте новый.
+            </div>
+        </div>
+
+        <div class="panel-section">
+            <div class="section-title">
+                Слои
+                <span style="font-size: 12px; color: var(--text-muted);" id="layersCount">0</span>
+            </div>
+            <div id="layersList">
+                <div style="color: var(--text-muted); font-size: 14px; text-align: center; padding: 20px 0;">Пока пусто</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // ==========================================
+    // СОСТОЯНИЕ
+    // ==========================================
+    const canvas = document.getElementById('memeCanvas');
+    const ctx = canvas.getContext('2d');
+    
+    const state = {
+        bgImage: null,
+        objects: [],
+        selectedId: null,
+        tool: 'select',
+        nextId: 1,
+        brushColor: '#000000',
+        brushSize: 5,
+        isDrawing: false,
+        currentPath: [],
+        history: [],
+        historyIndex: -1,
+        maxHistory: 30,
+        // Drag & drop
+        isDragging: false,
+        dragOffsetX: 0,
+        dragOffsetY: 0,
+        // Кэш картинок стикеров
+        stickerImages: {}
+    };
+    
+    // ==========================================
+    // ИНИЦИАЛИЗАЦИЯ
+    // ==========================================
+    window.onload = async function() {
+        // Фон по умолчанию (можно убрать, если не нужен)
+        const defaultImg = new Image();
+        defaultImg.crossOrigin = "Anonymous";
+        defaultImg.src = "{{ url_for('static', filename='images/mem1.webp') }}";
+        defaultImg.onload = () => {
+            state.bgImage = defaultImg;
+            resizeCanvasToImage();
+            render();
+            saveHistory();
+        };
+        
+        // Загружаем список стикеров с сервера
+        await loadStickers();
+        
+        // Обработчики мыши
+        canvas.addEventListener('mousedown', onMouseDown);
+        canvas.addEventListener('mousemove', onMouseMove);
+        canvas.addEventListener('mouseup', onMouseUp);
+        canvas.addEventListener('mouseleave', onMouseUp);
+        
+        // Горячие клавиши
+        document.addEventListener('keydown', (e) => {
+            if (e.ctrlKey && e.key === 'z') { e.preventDefault(); undo(); }
+            if (e.ctrlKey && e.key === 'y') { e.preventDefault(); redo(); }
+            if (e.key === 'Delete' && state.selectedId) { deleteSelected(); }
+        });
+    };
+
+    async function loadStickers() {
+        const grid = document.getElementById('stickerGrid');
+        try {
+            const resp = await fetch('/api/stickers');
+            const urls = await resp.json();
+            
+            if (!urls || urls.length === 0) {
+                grid.innerHTML = '<div class="empty-stickers">Папка static/stickers пуста.<br>Добавьте PNG-файлы и перезагрузите.</div>';
+                return;
+            }
+            
+            grid.innerHTML = '';
+            urls.forEach(url => {
+                const div = document.createElement('div');
+                div.className = 'sticker-item';
+                const img = document.createElement('img');
+                img.src = url;
+                img.alt = 'sticker';
+                div.appendChild(img);
+                div.onclick = () => addSticker(url);
+                grid.appendChild(div);
+            });
+        } catch (e) {
+            grid.innerHTML = '<div class="empty-stickers">Не удалось загрузить стикеры</div>';
+        }
+    }
+
+    // ==========================================
+    // РАЗМЕР ХОЛСТА
+    // ==========================================
+    function resizeCanvasToImage() {
+        if (!state.bgImage) return;
+        const maxSize = 800;
+        let w = state.bgImage.width;
+        let h = state.bgImage.height;
+        if (w > maxSize || h > maxSize) {
+            const ratio = Math.min(maxSize / w, maxSize / h);
+            w *= ratio;
+            h *= ratio;
+        }
+        canvas.width = w;
+        canvas.height = h;
+    }
+
+    // ==========================================
+    // ОТРИСОВКА
+    // ==========================================
+    function render() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        
+        if (state.bgImage) {
+            ctx.drawImage(state.bgImage, 0, 0, canvas.width, canvas.height);
+        } else {
+            ctx.fillStyle = "#e0e0e0";
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+        }
+        
+        state.objects.forEach(obj => {
+            if (obj.hidden) return;
+            if (obj.type === 'text') drawText(obj);
+            else if (obj.type === 'sticker') drawSticker(obj);
+            else if (obj.type === 'brush') drawBrush(obj);
+            
+            if (obj.id === state.selectedId) drawSelectionBox(obj);
+        });
+    }
+
+    function drawText(obj) {
+        ctx.font = `bold ${obj.fontSize}px ${obj.fontFamily}`;
+        ctx.textAlign = "center";
+        ctx.lineJoin = "round";
+        ctx.textBaseline = "middle";
+        ctx.strokeStyle = obj.strokeColor;
+        ctx.lineWidth = obj.fontSize / 8;
+        ctx.strokeText(obj.text, obj.x, obj.y);
+        ctx.fillStyle = obj.color;
+        ctx.fillText(obj.text, obj.x, obj.y);
+    }
+
+    function drawSticker(obj) {
+        const img = state.stickerImages[obj.src];
+        if (img && img.complete && img.naturalWidth > 0) {
+            ctx.drawImage(img, obj.x - obj.size/2, obj.y - obj.size/2, obj.size, obj.size);
+        } else {
+            // Плейсхолдер пока грузится
+            ctx.fillStyle = '#ccc';
+            ctx.fillRect(obj.x - obj.size/2, obj.y - obj.size/2, obj.size, obj.size);
+        }
+    }
+
+    function drawBrush(obj) {
+        if (!obj.points || obj.points.length < 2) return;
+        ctx.beginPath();
+        ctx.strokeStyle = obj.color;
+        ctx.lineWidth = obj.size;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        ctx.moveTo(obj.points[0].x, obj.points[0].y);
+        for (let i = 1; i < obj.points.length; i++) {
+            ctx.lineTo(obj.points[i].x, obj.points[i].y);
+        }
+        ctx.stroke();
+    }
+
+    function drawSelectionBox(obj) {
+        ctx.save();
+        ctx.strokeStyle = '#e462fb';
+        ctx.lineWidth = 2;
+        ctx.setLineDash([5, 5]);
+        
+        if (obj.type === 'text') {
+            ctx.font = `bold ${obj.fontSize}px ${obj.fontFamily}`;
+            const metrics = ctx.measureText(obj.text);
+            const w = metrics.width;
+            const h = obj.fontSize;
+            ctx.strokeRect(obj.x - w/2 - 5, obj.y - h/2 - 5, w + 10, h + 10);
+        } else if (obj.type === 'sticker') {
+            ctx.strokeRect(obj.x - obj.size/2, obj.y - obj.size/2, obj.size, obj.size);
+        } else if (obj.type === 'brush' && obj.points) {
+            const xs = obj.points.map(p => p.x);
+            const ys = obj.points.map(p => p.y);
+            const minX = Math.min(...xs) - 10;
+            const minY = Math.min(...ys) - 10;
+            const maxX = Math.max(...xs) + 10;
+            const maxY = Math.max(...ys) + 10;
+            ctx.strokeRect(minX, minY, maxX - minX, maxY - minY);
+        }
+        ctx.restore();
+    }
+
+    // ==========================================
+    // ДОБАВЛЕНИЕ
+    // ==========================================
+    function addText() {
+        const obj = {
+            id: state.nextId++,
+            type: 'text',
+            text: 'Ваш текст',
+            x: canvas.width / 2,
+            y: canvas.height / 2,
+            fontSize: 48,
+            fontFamily: 'Impact, sans-serif',
+            color: '#ffffff',
+            strokeColor: '#000000',
+            hidden: false
+        };
+        state.objects.push(obj);
+        state.selectedId = obj.id;
+        state.tool = 'select';
+        updateToolButtons();
+        render();
+        renderLayers();
+        renderProperties();
+        saveHistory();
+    }
+
+    async function addSticker(url) {
+        // Загружаем картинку, если ещё не загружена
+        if (!state.stickerImages[url]) {
+            const img = new Image();
+            img.crossOrigin = "Anonymous";
+            img.src = url;
+            await new Promise(resolve => {
+                img.onload = resolve;
+                img.onerror = resolve;
+            });
+            state.stickerImages[url] = img;
+        }
+        
+        const obj = {
+            id: state.nextId++,
+            type: 'sticker',
+            src: url,
+            x: canvas.width / 2,
+            y: canvas.height / 2,
+            size: 120,
+            hidden: false
+        };
+        state.objects.push(obj);
+        state.selectedId = obj.id;
+        render();
+        renderLayers();
+        renderProperties();
+        saveHistory();
+        document.getElementById('stickerPanel').classList.remove('active');
+    }
+
+    // ==========================================
+    // МЫШЬ: КЛИК, DRAG, РИСОВАНИЕ
+    // ==========================================
+    function getMousePos(e) {
+        const rect = canvas.getBoundingClientRect();
+        return {
+            x: (e.clientX - rect.left) * (canvas.width / rect.width),
+            y: (e.clientY - rect.top) * (canvas.height / rect.height)
+        };
+    }
+
+    function onMouseDown(e) {
+        const pos = getMousePos(e);
+        
+        if (state.tool === 'brush') {
+            state.isDrawing = true;
+            state.currentPath = [pos];
+            return;
+        }
+        
+        if (state.tool === 'select') {
+            const clicked = findObjectAt(pos.x, pos.y);
+            
+            if (clicked) {
+                // Выделяем и начинаем перетаскивание
+                state.selectedId = clicked.id;
+                state.isDragging = true;
+                state.dragOffsetX = pos.x - clicked.x;
+                state.dragOffsetY = pos.y - clicked.y;
+            } else {
+                state.selectedId = null;
+            }
+            
+            render();
+            renderLayers();
+            renderProperties();
+        }
+    }
+
+    function onMouseMove(e) {
+        const pos = getMousePos(e);
+        
+        // Рисование
+        if (state.isDrawing) {
+            state.currentPath.push(pos);
+            render();
+            ctx.beginPath();
+            ctx.strokeStyle = state.brushColor;
+            ctx.lineWidth = state.brushSize;
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+            ctx.moveTo(state.currentPath[0].x, state.currentPath[0].y);
+            for (let i = 1; i < state.currentPath.length; i++) {
+                ctx.lineTo(state.currentPath[i].x, state.currentPath[i].y);
+            }
+            ctx.stroke();
+            return;
+        }
+        
+        // Перетаскивание
+        if (state.isDragging && state.selectedId) {
+            const obj = state.objects.find(o => o.id === state.selectedId);
+            if (obj && (obj.type === 'text' || obj.type === 'sticker')) {
+                obj.x = pos.x - state.dragOffsetX;
+                obj.y = pos.y - state.dragOffsetY;
+                render();
+            }
+        } else {
+            // Меняем курсор, если над объектом
+            if (state.tool === 'select') {
+                const over = findObjectAt(pos.x, pos.y);
+                canvas.classList.toggle('movable', !!over);
+            }
+        }
+    }
+
+    function onMouseUp() {
+        if (state.isDrawing && state.currentPath.length > 1) {
+            const obj = {
+                id: state.nextId++,
+                type: 'brush',
+                points: [...state.currentPath],
+                color: state.brushColor,
+                size: state.brushSize,
+                hidden: false
+            };
+            state.objects.push(obj);
+            state.selectedId = obj.id;
+            renderLayers();
+            renderProperties();
+            saveHistory();
+        }
+        
+        if (state.isDragging) {
+            // Сохраняем позицию в историю
+            saveHistory();
+            state.isDragging = false;
+        }
+        
+        state.isDrawing = false;
+        state.currentPath = [];
+        render();
+    }
+
+    function findObjectAt(x, y) {
+        for (let i = state.objects.length - 1; i >= 0; i--) {
+            const obj = state.objects[i];
+            if (obj.hidden) continue;
+            
+            if (obj.type === 'text') {
+                ctx.font = `bold ${obj.fontSize}px ${obj.fontFamily}`;
+                const metrics = ctx.measureText(obj.text);
+                if (Math.abs(x - obj.x) < metrics.width / 2 && Math.abs(y - obj.y) < obj.fontSize / 2) return obj;
+            } else if (obj.type === 'sticker') {
+                if (Math.abs(x - obj.x) < obj.size / 2 && Math.abs(y - obj.y) < obj.size / 2) return obj;
+            } else if (obj.type === 'brush' && obj.points) {
+                for (let p of obj.points) {
+                    if (Math.hypot(x - p.x, y - p.y) < obj.size / 2 + 5) return obj;
+                }
+            }
+        }
+        return null;
+    }
+
+    // ==========================================
+    // СВОЙСТВА
+    // ==========================================
+    function renderProperties() {
+        const container = document.getElementById('propertiesContent');
+        const obj = state.objects.find(o => o.id === state.selectedId);
+        
+        if (!obj) {
+            container.innerHTML = 'Выберите объект на холсте или добавьте новый.';
+            return;
+        }
+        
+        let html = '';
+        
+        if (obj.type === 'text') {
+            html = `
+                <div class="prop-group">
+                    <label class="prop-label">Текст</label>
+                    <input type="text" class="input-text" value="${obj.text.replace(/"/g, '&quot;')}" oninput="updateProp('text', this.value)">
+                </div>
+                <div class="prop-group">
+                    <label class="prop-label">Шрифт</label>
+                    <select class="input-select" onchange="updateProp('fontFamily', this.value)">
+                        <option value="Impact, sans-serif" ${obj.fontFamily.includes('Impact') ? 'selected' : ''}>Impact</option>
+                        <option value="Arial, sans-serif" ${obj.fontFamily.includes('Arial') ? 'selected' : ''}>Arial</option>
+                        <option value="Rubik, sans-serif" ${obj.fontFamily.includes('Rubik') ? 'selected' : ''}>Rubik</option>
+                        <option value="Comic Sans MS, cursive" ${obj.fontFamily.includes('Comic') ? 'selected' : ''}>Comic Sans</option>
+                    </select>
+                </div>
+                <div class="prop-row">
+                    <div style="flex: 1;">
+                        <label class="prop-label">Размер</label>
+                        <input type="number" class="input-text" value="${obj.fontSize}" min="10" max="200" oninput="updateProp('fontSize', parseInt(this.value))">
+                    </div>
+                    <div style="flex: 1;">
+                        <label class="prop-label">Цвет</label>
+                        <div class="input-color-wrapper">
+                            <input type="color" class="input-color" value="${obj.color}" oninput="updateProp('color', this.value)">
+                        </div>
+                    </div>
+                </div>
+            `;
+        } else if (obj.type === 'sticker') {
+            html = `
+                <div class="prop-group">
+                    <label class="prop-label">Стикер</label>
+                    <img src="${obj.src}" style="max-width: 100%; max-height: 100px; display: block; margin: 0 auto;">
+                </div>
+                <div class="prop-group">
+                    <label class="prop-label">Размер: ${obj.size}px</label>
+                    <input type="range" min="30" max="400" value="${obj.size}" style="width: 100%;" oninput="updateProp('size', parseInt(this.value))">
+                </div>
+            `;
+        } else if (obj.type === 'brush') {
+            html = `
+                <div class="prop-group">
+                    <label class="prop-label">Цвет кисти</label>
+                    <div class="input-color-wrapper">
+                        <input type="color" class="input-color" value="${obj.color}" oninput="updateProp('color', this.value)">
+                    </div>
+                </div>
+                <div class="prop-group">
+                    <label class="prop-label">Толщина: ${obj.size}px</label>
+                    <input type="range" min="1" max="50" value="${obj.size}" style="width: 100%;" oninput="updateProp('size', parseInt(this.value))">
+                </div>
+            `;
+        }
+        
+        html += `
+            <div style="margin-top: 16px;">
+                <button onclick="deleteSelected()" style="width: 100%; padding: 10px; background: #FFE0E0; color: var(--danger-color); border: none; border-radius: 8px; font-weight: 600; cursor: pointer;">🗑 Удалить объект</button>
+            </div>
+        `;
+        
+        container.innerHTML = html;
+    }
+
+    function updateProp(key, value) {
+        const obj = state.objects.find(o => o.id === state.selectedId);
+        if (!obj) return;
+        obj[key] = value;
+        render();
+        renderLayers();
+        saveHistory();
+    }
+
+    // ==========================================
+    // СЛОИ
+    // ==========================================
+    function renderLayers() {
+        const list = document.getElementById('layersList');
+        document.getElementById('layersCount').textContent = state.objects.length;
+        
+        if (state.objects.length === 0) {
+            list.innerHTML = '<div style="color: var(--text-muted); font-size: 14px; text-align: center; padding: 20px 0;">Пока пусто</div>';
+            return;
+        }
+        
+        list.innerHTML = '';
+        [...state.objects].reverse().forEach(obj => {
+            const div = document.createElement('div');
+            div.className = 'layer-item' + (obj.id === state.selectedId ? ' active' : '');
+            
+            let icon = '📝', name = 'Объект';
+            if (obj.type === 'text') { icon = 'T'; name = obj.text.substring(0, 20) || 'Текст'; }
+            else if (obj.type === 'sticker') { icon = '🖼'; name = 'Стикер'; }
+            else if (obj.type === 'brush') { icon = '🖌'; name = 'Штрих'; }
+            
+            div.innerHTML = `
+                <div class="layer-name"><span>${icon}</span> ${name}</div>
+                <div class="layer-controls">
+                    <button class="btn-layer-ctrl" title="Видимость" onclick="event.stopPropagation(); toggleHidden(${obj.id})">${obj.hidden ? '👁‍🗨' : '👁'}</button>
+                    <button class="btn-layer-ctrl" title="Выше" onclick="event.stopPropagation(); moveUp(${obj.id})">↑</button>
+                    <button class="btn-layer-ctrl" title="Ниже" onclick="event.stopPropagation(); moveDown(${obj.id})">↓</button>
+                    <button class="btn-layer-ctrl" title="Удалить" onclick="event.stopPropagation(); deleteObj(${obj.id})">✕</button>
+                </div>
+            `;
+            
+            div.onclick = () => {
+                state.selectedId = obj.id;
+                render();
+                renderLayers();
+                renderProperties();
+            };
+            
+            list.appendChild(div);
+        });
+    }
+
+    function toggleHidden(id) {
+        const obj = state.objects.find(o => o.id === id);
+        if (obj) { obj.hidden = !obj.hidden; render(); renderLayers(); saveHistory(); }
+    }
+    function moveUp(id) {
+        const idx = state.objects.findIndex(o => o.id === id);
+        if (idx < state.objects.length - 1) {
+            [state.objects[idx], state.objects[idx + 1]] = [state.objects[idx + 1], state.objects[idx]];
+            render(); renderLayers(); saveHistory();
+        }
+    }
+    function moveDown(id) {
+        const idx = state.objects.findIndex(o => o.id === id);
+        if (idx > 0) {
+            [state.objects[idx], state.objects[idx - 1]] = [state.objects[idx - 1], state.objects[idx]];
+            render(); renderLayers(); saveHistory();
+        }
+    }
+    function deleteObj(id) {
+        state.objects = state.objects.filter(o => o.id !== id);
+        if (state.selectedId === id) state.selectedId = null;
+        render(); renderLayers(); renderProperties(); saveHistory();
+    }
+    function deleteSelected() {
+        if (state.selectedId) deleteObj(state.selectedId);
+    }
+
+    // ==========================================
+    // ИСТОРИЯ
+    // ==========================================
+    function saveHistory() {
+        state.history = state.history.slice(0, state.historyIndex + 1);
+        const snapshot = JSON.stringify({
+            objects: state.objects,
+            selectedId: state.selectedId,
+            nextId: state.nextId
+        });
+        state.history.push(snapshot);
+        if (state.history.length > state.maxHistory) state.history.shift();
+        state.historyIndex = state.history.length - 1;
+    }
+
+    function undo() {
+        if (state.historyIndex <= 0) return;
+        state.historyIndex--;
+        restoreHistory();
+    }
+
+    function redo() {
+        if (state.historyIndex >= state.history.length - 1) return;
+        state.historyIndex++;
+        restoreHistory();
+    }
+
+    function restoreHistory() {
+        const snapshot = JSON.parse(state.history[state.historyIndex]);
+        state.objects = snapshot.objects;
+        state.selectedId = snapshot.selectedId;
+        state.nextId = snapshot.nextId;
+        render(); renderLayers(); renderProperties();
+    }
+
+    // ==========================================
+    // ИНСТРУМЕНТЫ
+    // ==========================================
+    function setTool(tool) {
+        state.tool = tool;
+        document.getElementById('toolSelect').classList.toggle('active', tool === 'select');
+        document.getElementById('toolBrush').classList.toggle('active', tool === 'brush');
+        canvas.classList.toggle('drawing', tool === 'brush');
+    }
+
+    function toggleStickerPanel() {
+        document.getElementById('stickerPanel').classList.toggle('active');
+    }
+
+    // ==========================================
+    // ФОН / СКАЧИВАНИЕ
+    // ==========================================
+    function loadBackground(event) {
+        const file = event.target.files[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const img = new Image();
+                img.onload = () => {
+                    state.bgImage = img;
+                    resizeCanvasToImage();
+                    render();
+                    saveHistory();
+                };
+                img.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
+    }
+
+    function downloadMeme() {
+        const prevSelected = state.selectedId;
+        state.selectedId = null;
+        render();
+        
+        const link = document.createElement('a');
+        link.download = 'my_memair_meme.png';
+        link.href = canvas.toDataURL('image/png');
+        link.click();
+        
+        state.selectedId = prevSelected;
+        render();
+    }
+</script>
+{% endblock %}

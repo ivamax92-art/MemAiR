@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}Вход — MemAiR{% endblock %}
+
+{% block content %}
+<div style="min-height: 70vh; display: flex; align-items: center; justify-content: center;">
+    <div style="background: rgba(255, 255, 255, 0.9); backdrop-filter: blur(10px); padding: 40px; border-radius: var(--radius-lg); box-shadow: var(--shadow-hover); width: 100%; max-width: 400px;">
+        <h2 style="text-align: center; margin-bottom: 30px; font-size: 28px; font-weight: 800;">Вход</h2>
+        {% with messages = get_flashed_messages() %}
+          {% if messages %}
+            <div style="background: rgba(255, 71, 87, 0.1); color: var(--danger-color); padding: 10px; border-radius: 8px; margin-bottom: 20px; text-align: center;">{{ messages[0] }}</div>
+          {% endif %}
+        {% endwith %}
+        <form method="POST">
+            <div style="margin-bottom: 15px;">
+                <input type="email" name="email" placeholder="E-mail" required style="width: 100%; padding: 12px; border: 2px solid #eee; border-radius: 12px;">
+            </div>
+            <div style="margin-bottom: 25px;">
+                <input type="password" name="password" placeholder="Пароль" required style="width: 100%; padding: 12px; border: 2px solid #eee; border-radius: 12px;">
+            </div>
+            <button type="submit" style="width: 100%; padding: 14px; border-radius: 12px; background: linear-gradient(135deg, var(--color-orange), var(--color-purple)); color: white; font-weight: 700; font-size: 16px; border: none; cursor: pointer;">Войти</button>
+        </form>
+        <p style="text-align: center; margin-top: 20px; color: var(--text-muted);">Нет аккаунта? <a href="{{ url_for('register') }}" style="color: var(--color-purple); font-weight: 600;">Зарегистрироваться</a></p>
+    </div>
+</div>
+{% endblock %}
